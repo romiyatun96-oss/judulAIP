@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Game: Detektif Artikel Ilmiah</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #fdfbfb 0%, #ebedee 100%);
+            overscroll-behavior-y: contain; /* Prevent pull-to-refresh on mobile */
+        }
+        
+        .card-container {
+            perspective: 1000px;
+            width: 100%;
+            max-width: 400px;
+            height: 300px;
+            position: relative;
+            margin: 0 auto;
+        }
+
+        .swipe-card {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: white;
+            border-radius: 1.5rem;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+            text-align: center;
+            font-size: 1.25rem;
+            font-weight: 600;
+            cursor: grab;
+            user-select: none;
+            transition: transform 0.3s ease, opacity 0.3s ease;
+            transform-origin: 50% 100%;
+            will-change: transform;
+        }
+
+        .swipe-card.dragging {
+            transition: none;
+            cursor: grabbing;
+        }
+
+        .swipe-card.animate-out-left {
+            transform: translateX(-150%) rotate(-15deg);
+            opacity: 0;
+        }
+
+        .swipe-card.animate-out-right {
+            transform: translateX(150%) rotate(15deg);
+            opacity: 0;
+        }
+
+        /* Indikator Pilihan (Muncul saat digeser) */
+        .stamp {
+            position: absolute;
+            top: 20px;
+            font-size: 2rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            border: 4px solid;
+            border-radius: 10px;
+            padding: 0.5rem 1rem;
+            opacity: 0;
+            transition: opacity 0.1s;
+        }
+        
+        .stamp.nope {
+            color: #ef4444; /* Red for Ilmiah Murni */
+            border-color: #ef4444;
+            right: 20px;
+            transform: rotate(15deg);
+        }
+
+        .stamp.like {
+            color: #10b981; /* Green for Populer */
+            border-color: #10b981;
+            left: 20px;
+            transform: rotate(-15deg);
+        }
+
+        /* Animasi Feedback Modal */
+        @keyframes popIn {
+            0% { transform: scale(0.8); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        .animate-pop-in {
+            animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col text-slate-800">
+
+    <div id="home-screen" class="fixed inset-0 z-50 flex items-center justify-center bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 p-4">
+        <div class="bg-white/95 backdrop-blur-sm p-8 rounded-3xl shadow-2xl max-w-md w-full animate-pop-in text-center border-4 border-white/50">
+            <div class="text-7xl mb-4 drop-shadow-md">🕵️‍♂️🔍</div>
+            <h1 class="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-pink-600 mb-2">Detektif Artikel</h1>
+            <p class="text-slate-600 mb-6 font-medium">Siap menguji instingmu membedakan artikel ilmiah murni & populer?</p>
+
+            <div class="space-y-4 mb-8 text-left">
+                <div>
+                    <label for="student-name" class="block text-sm font-bold text-slate-700 mb-1 ml-1">Nama Kamu</label>
+                    <input type="text" id="student-name" placeholder="Ketik namamu di sini..." class="w-full px-5 py-4 rounded-2xl border-2 border-indigo-100 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/20 outline-none transition-all font-semibold text-slate-700 bg-indigo-50/50">
+                    <p id="error-name" class="text-red-500 text-xs font-semibold mt-1 ml-1 hidden">Nama harus diisi, ya!</p>
+                </div>
+                <div>
+                    <label for="student-class" class="block text-sm font-bold text-slate-700 mb-1 ml-1">Kelas</label>
+                    <select id="student-class" class="w-full px-5 py-4 rounded-2xl border-2 border-indigo-100 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/20 outline-none transition-all font-semibold text-slate-700 bg-indigo-50/50 appearance-none cursor-pointer">
+                        <option value="" disabled selected>Pilih kelasmu...</option>
+                        <option value="9A">Kelas 9A</option>
+                        <option value="9B">Kelas 9B</option>
+                        <option value="9C">Kelas 9C</option>
+                        <option value="9D">Kelas 9D</option>
+                    </select>
+                    <p id="error-class" class="text-red-500 text-xs font-semibold mt-1 ml-1 hidden">Pilih kelasmu dulu!</p>
+                </div>
+            </div>
+
+            <button id="btn-start" class="w-full bg-gradient-to-r from-indigo-600 to-pink-600 hover:from-indigo-700 hover:to-pink-700 text-white font-bold py-4 px-6 rounded-2xl transition-all transform hover:scale-[1.02] active:scale-95 shadow-xl shadow-pink-500/30 text-lg uppercase tracking-wide">
+                Mulai Bermain! 🚀
+            </button>
+        </div>
+    </div>
+
+    <div id="game-screen" class="hidden flex-col min-h-screen flex-grow w-full">
+        <header class="p-6 text-center">
+            <h1 class="text-3xl font-extrabold text-indigo-700 mb-2">Detektif Artikel</h1>
+            <p class="text-slate-600 mb-4 text-sm md:text-base">Halo <span id="display-player-name" class="font-bold text-indigo-600 text-lg">Detektif</span>! Bantu memilah. Geser kiri untuk <strong>Ilmiah Murni</strong>, geser kanan untuk <strong>Ilmiah Populer</strong>.</p>
+            
+            <div class="flex justify-between items-center bg-white p-3 md:p-4 rounded-xl shadow-sm max-w-md mx-auto">
+                <div class="text-center">
+                    <span class="block text-xs text-slate-500 uppercase tracking-wider font-semibold">Skor</span>
+                    <span id="score" class="text-2xl font-bold text-indigo-600">0</span>
+                </div>
+                <div class="text-center">
+                    <span class="block text-xs text-slate-500 uppercase tracking-wider font-semibold">Sisa</span>
+                    <span id="remaining" class="text-2xl font-bold text-slate-700">0</span>
+                </div>
+            </div>
+        </header>
+
+        <main class="flex-grow flex flex-col justify-center items-center p-4 relative overflow-hidden">
+            
+            <!-- Tempat Kartu Muncul -->
+            <div id="card-container" class="card-container z-20"></div>
+
+            <!-- Instruksi Area (Desktop) -->
+        <div class="flex gap-6 mt-10 z-10">
+            <button id="btn-ilmiah" class="bg-white border-2 border-red-200 text-red-600 hover:bg-red-50 hover:border-red-500 rounded-full w-16 h-16 flex items-center justify-center shadow-lg transition-all focus:outline-none focus:ring-4 focus:ring-red-200 active:scale-95">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+            <button id="btn-populer" class="bg-white border-2 border-emerald-200 text-emerald-600 hover:bg-emerald-50 hover:border-emerald-500 rounded-full w-16 h-16 flex items-center justify-center shadow-lg transition-all focus:outline-none focus:ring-4 focus:ring-emerald-200 active:scale-95">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                </svg>
+            </button>
+        </div>
+    </main>
+    </div> <!-- End of game-screen -->
+
+    <div id="feedback-modal" class="fixed inset-0 bg-slate-900/60 z-50 hidden flex items-center justify-center p-4 backdrop-blur-sm">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center animate-pop-in">
+            <div id="feedback-icon" class="mx-auto w-20 h-20 rounded-full flex items-center justify-center mb-4">
+                <!-- Icon disuntikkan via JS -->
+            </div>
+            <h2 id="feedback-title" class="text-2xl font-bold mb-2"></h2>
+            <p id="feedback-message" class="text-slate-600 mb-6 text-sm md:text-base"></p>
+            <p id="feedback-explanation" class="text-sm bg-slate-50 p-3 rounded-lg text-slate-700 text-left mb-6 italic"></p>
+            <button id="btn-next" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 px-6 rounded-xl transition-colors">
+                Lanjut
+            </button>
+        </div>
+    </div>
+
+    <div id="end-screen" class="fixed inset-0 bg-indigo-50 z-50 hidden flex-col items-center justify-center p-4">
+        <div class="bg-white p-8 rounded-3xl shadow-xl text-center max-w-md w-full animate-pop-in border-t-8 border-indigo-500">
+            <div class="text-6xl mb-4">🎉</div>
+            <h2 class="text-3xl font-extrabold text-slate-800 mb-2">Hebat, <span id="end-player-name" class="text-indigo-600">Detektif</span>!</h2>
+            <p class="text-slate-600 mb-2 font-medium">Laporan penyelidikanmu sudah selesai.</p>
+            
+            <div class="inline-block bg-pink-100 text-pink-700 px-4 py-1 rounded-full text-sm font-bold mb-6" id="end-player-class">
+                Kelas --
+            </div>
+            
+            <div class="bg-gradient-to-br from-indigo-50 to-purple-50 border border-indigo-100 p-6 rounded-2xl mb-8 shadow-inner">
+                <span class="block text-sm text-indigo-400 font-bold uppercase tracking-wider mb-2">Skor Akhir</span>
+                <span id="final-score" class="text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-600">0</span>
+                <span class="text-xl text-indigo-400 font-bold">/ <span id="total-questions">0</span></span>
+            </div>
+            
+            <button onclick="location.reload()" class="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-bold py-4 px-6 rounded-xl transition-all transform hover:scale-[1.02] shadow-lg shadow-indigo-200">
+                Main Lagi
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // Database Pertanyaan (Judul Artikel)
+        // type: 'ilmiah' (murni/jurnal) atau 'populer' (majalah/blog)
+        const questionsDB = [
+            {
+                title: "Pengaruh Penggunaan Media Sosial Terhadap Tingkat Stres Akademik Mahasiswa Universitas X",
+                type: "ilmiah",
+                explanation: "Judul ini menggunakan bahasa yang baku, spesifik menyebutkan variabel penelitian (media sosial, stres akademik), dan subjek (Mahasiswa Universitas X). Khas artikel jurnal penelitian."
+            },
+            {
+                title: "5 Tips Ampuh Mengatasi Stres Belajar, Mahasiswa Wajib Coba!",
+                type: "populer",
+                explanation: "Menggunakan gaya bahasa santai ('Ampuh', 'Wajib Coba!'), format angka ('5 Tips'), dan bertujuan menarik perhatian pembaca secara langsung. Khas artikel blog/majalah."
+            },
+            {
+                title: "Analisis Sentimen Pengguna Twitter Terhadap Pemindahan Ibu Kota Negara Menggunakan Algoritma Naive Bayes",
+                type: "ilmiah",
+                explanation: "Memiliki struktur yang sangat teknis, menyebutkan metode spesifik (Algoritma Naive Bayes) dan objek kajian (Analisis Sentimen). Ini adalah artikel ilmiah murni."
+            },
+            {
+                title: "Ibu Kota Pindah ke Kalimantan, Apa Kata Netizen?",
+                type: "populer",
+                explanation: "Judulnya singkat, berupa pertanyaan yang memancing rasa ingin tahu, dan menggunakan istilah populer ('Netizen'). Sangat khas artikel berita/populer."
+            },
+            {
+                title: "Efektivitas Ekstrak Daun Binahong (Anredera cordifolia) Sebagai Penyembuh Luka Bakar pada Mencit (Mus musculus)",
+                type: "ilmiah",
+                explanation: "Menggunakan nama latin ilmiah untuk tanaman dan hewan uji. Sangat spesifik dan akademis."
+            },
+            {
+                title: "Ajaib! Daun Binahong Ternyata Bisa Sembuhkan Luka Bakar dengan Cepat",
+                type: "populer",
+                explanation: "Menggunakan kata seru ('Ajaib!'), bahasa hiperbolis, dan klaim ('Sembuhkan dengan cepat') untuk menarik minat pembaca umum."
+            },
+            {
+                title: "Perancangan Aplikasi E-Commerce Berbasis Web Menggunakan Framework CodeIgniter",
+                type: "ilmiah",
+                explanation: "Fokus pada proses metodologis ('Perancangan') dan menyebutkan teknologi spesifik yang digunakan. Umum dijumpai pada jurnal atau skripsi IT."
+            },
+            {
+                title: "Bikin Toko Online Sendiri Ternyata Gampang Banget, Begini Caranya!",
+                type: "populer",
+                explanation: "Bahasa sehari-hari ('Gampang Banget', 'Bikin'), sangat komunikatif dan menjanjikan solusi praktis."
+            },
+            {
+                title: "Dampak Perubahan Iklim Global terhadap Penurunan Populasi Terumbu Karang di Perairan Wakatobi",
+                type: "ilmiah",
+                explanation: "Mengkaji hubungan sebab-akibat ('Dampak') dengan lokasi penelitian yang jelas ('Perairan Wakatobi'). Objektif dan informatif."
+            },
+            {
+                title: "Bumi Makin Panas, Terumbu Karang Kita Sekarat!",
+                type: "populer",
+                explanation: "Menggunakan bahasa yang emosional ('Sekarat', 'Makin Panas') untuk menggugah kesadaran pembaca. Cocok untuk artikel lingkungan di portal berita."
+            }
+        ];
+
+        // State Aplikasi
+        let currentQuestions = [];
+        let score = 0;
+        let currentCardIndex = 0;
+        let activeCard = null;
+
+        // Elemen DOM
+        const cardContainer = document.getElementById('card-container');
+        const scoreEl = document.getElementById('score');
+        const remainingEl = document.getElementById('remaining');
+        
+        const feedbackModal = document.getElementById('feedback-modal');
+        const feedbackIcon = document.getElementById('feedback-icon');
+        const feedbackTitle = document.getElementById('feedback-title');
+        const feedbackMessage = document.getElementById('feedback-message');
+        const feedbackExplanation = document.getElementById('feedback-explanation');
+        const btnNext = document.getElementById('btn-next');
+        
+        const btnIlmiah = document.getElementById('btn-ilmiah');
+        const btnPopuler = document.getElementById('btn-populer');
+
+        // Fungsi acak array (Fisher-Yates)
+        function shuffle(array) {
+            let currentIndex = array.length, randomIndex;
+            while (currentIndex != 0) {
+                randomIndex = Math.floor(Math.random() * currentIndex);
+                currentIndex--;
+                [array[currentIndex], array[randomIndex]] = [array[randomIndex], array[currentIndex]];
+            }
+            return array;
+        }
+
+        // Inisialisasi Game
+        function initGame() {
+            // Gandakan array agar tidak memodifikasi data asli, lalu acak
+            currentQuestions = shuffle([...questionsDB]); 
+            score = 0;
+            currentCardIndex = 0;
+            updateUI();
+            renderCards();
+        }
+
+        function updateUI() {
+            scoreEl.textContent = score;
+            remainingEl.textContent = currentQuestions.length - currentCardIndex;
+            document.getElementById('total-questions').textContent = currentQuestions.length;
+        }
+
+        function renderCards() {
+            cardContainer.innerHTML = '';
+            
+            // Render dari belakang ke depan agar tumpukan benar
+            for (let i = currentQuestions.length - 1; i >= currentCardIndex; i--) {
+                const q = currentQuestions[i];
+                const card = document.createElement('div');
+                card.className = 'swipe-card absolute inset-0 bg-white border border-slate-100 flex flex-col items-center justify-center p-6 text-center text-lg md:text-xl font-semibold leading-relaxed shadow-xl rounded-3xl';
+                
+                // Tambahkan sedikit rotasi acak dan offset untuk efek tumpukan
+                const isTopCard = i === currentCardIndex;
+                if (!isTopCard) {
+                    const offset = (i - currentCardIndex) * 4;
+                    const scale = 1 - (i - currentCardIndex) * 0.05;
+                    card.style.transform = `translateY(${offset}px) scale(${scale})`;
+                    card.style.opacity = 1 - (i - currentCardIndex) * 0.2;
+                    card.style.pointerEvents = 'none'; // Hanya kartu atas yang bisa digeser
+                } else {
+                    card.style.zIndex = 10;
+                }
+
+                // Inner HTML Kartu
+                card.innerHTML = `
+                    <div class="stamp nope">ILMIAH</div>
+                    <div class="stamp like">POPULER</div>
+                    <div class="text-slate-800 relative z-10 w-full h-full flex items-center justify-center pointer-events-none">
+                        &ldquo;${q.title}&rdquo;
+                    </div>
+                `;
+
+                if (isTopCard) {
+                    setupSwipe(card, q);
+                    activeCard = card;
+                }
+
+                cardContainer.appendChild(card);
+            }
+        }
+
+        function setupSwipe(card, questionData) {
+            let isDragging = false;
+            let startX = 0;
+            let currentX = 0;
+            const threshold = window.innerWidth < 768 ? 100 : 150; // Jarak geser sebelum dianggap memilih
+
+            const nopeStamp = card.querySelector('.stamp.nope');
+            const likeStamp = card.querySelector('.stamp.like');
+
+            const startDrag = (e) => {
+                isDragging = true;
+                card.classList.add('dragging');
+                startX = e.type.includes('mouse') ? e.clientX : e.touches[0].clientX;
+            };
+
+            const onDrag = (e) => {
+                if (!isDragging) return;
+                
+                const clientX = e.type.includes('mouse') ? e.clientX : e.touches[0].clientX;
+                currentX = clientX - startX;
+                
+                // Rotasi berdasarkan jarak geser
+                const rotate = currentX * 0.1;
+                card.style.transform = `translateX(${currentX}px) rotate(${rotate}deg)`;
+
+                // Opasitas stamp berdasarkan arah geser
+                if (currentX < 0) {
+                    nopeStamp.style.opacity = Math.min(Math.abs(currentX) / threshold, 1);
+                    likeStamp.style.opacity = 0;
+                } else {
+                    likeStamp.style.opacity = Math.min(Math.abs(currentX) / threshold, 1);
+                    nopeStamp.style.opacity = 0;
+                }
+            };
+
+            const endDrag = () => {
+                if (!isDragging) return;
+                isDragging = false;
+                card.classList.remove('dragging');
+
+                if (currentX < -threshold) {
+                    handleChoice('ilmiah');
+                } else if (currentX > threshold) {
+                    handleChoice('populer');
+                } else {
+                    // Reset posisi jika geseran tidak cukup jauh
+                    card.style.transform = '';
+                    nopeStamp.style.opacity = 0;
+                    likeStamp.style.opacity = 0;
+                }
+            };
+
+            // Event Listeners untuk Mouse dan Touch
+            card.addEventListener('mousedown', startDrag);
+            document.addEventListener('mousemove', onDrag);
+            document.addEventListener('mouseup', endDrag);
+
+            card.addEventListener('touchstart', startDrag, {passive: true});
+            document.addEventListener('touchmove', onDrag, {passive: true});
+            document.addEventListener('touchend', endDrag);
+            
+            // Simpan referensi event listener untuk di-cleanup jika diperlukan
+            card._dragListeners = { startDrag, onDrag, endDrag };
+        }
+
+        function handleChoice(choice) {
+            if (!activeCard) return;
+
+            const question = currentQuestions[currentCardIndex];
+            const isCorrect = choice === question.type;
+
+            // Animasi kartu keluar
+            if (choice === 'ilmiah') {
+                activeCard.classList.add('animate-out-left');
+                activeCard.querySelector('.stamp.nope').style.opacity = 1;
+            } else {
+                activeCard.classList.add('animate-out-right');
+                activeCard.querySelector('.stamp.like').style.opacity = 1;
+            }
+
+            // Nonaktifkan interaksi sementara
+            activeCard.style.pointerEvents = 'none';
+            btnIlmiah.disabled = true;
+            btnPopuler.disabled = true;
+
+            setTimeout(() => {
+                showFeedback(isCorrect, question, choice);
+            }, 300); // Tunggu animasi selesai sedikit
+        }
+
+        function showFeedback(isCorrect, question, userChoice) {
+            if (isCorrect) {
+                score += 10;
+                feedbackIcon.className = 'mx-auto w-20 h-20 rounded-full flex items-center justify-center mb-4 bg-emerald-100 text-emerald-600';
+                feedbackIcon.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>`;
+                feedbackTitle.textContent = 'Tepat Sekali!';
+                feedbackTitle.className = 'text-2xl font-bold mb-2 text-emerald-600';
+                
+                const typeName = question.type === 'ilmiah' ? 'Ilmiah Murni' : 'Ilmiah Populer';
+                feedbackMessage.innerHTML = `Judul tersebut memang merupakan artikel <strong>${typeName}</strong>.`;
+            } else {
+                feedbackIcon.className = 'mx-auto w-20 h-20 rounded-full flex items-center justify-center mb-4 bg-red-100 text-red-600';
+                feedbackIcon.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>`;
+                feedbackTitle.textContent = 'Kurang Tepat';
+                feedbackTitle.className = 'text-2xl font-bold mb-2 text-red-600';
+                
+                const correctTypeName = question.type === 'ilmiah' ? 'Ilmiah Murni' : 'Ilmiah Populer';
+                feedbackMessage.innerHTML = `Judul tersebut sebenarnya adalah artikel <strong>${correctTypeName}</strong>.`;
+            }
+
+            feedbackExplanation.textContent = question.explanation;
+            feedbackModal.classList.remove('hidden');
+        }
+
+        btnNext.addEventListener('click', () => {
+            feedbackModal.classList.add('hidden');
+            
+            // Hapus event listener global dari kartu yang lama untuk mencegah memory leak
+            if (activeCard && activeCard._dragListeners) {
+                document.removeEventListener('mousemove', activeCard._dragListeners.onDrag);
+                document.removeEventListener('mouseup', activeCard._dragListeners.endDrag);
+                document.removeEventListener('touchmove', activeCard._dragListeners.onDrag);
+                document.removeEventListener('touchend', activeCard._dragListeners.endDrag);
+            }
+
+            currentCardIndex++;
+            updateUI();
+
+            btnIlmiah.disabled = false;
+            btnPopuler.disabled = false;
+
+            if (currentCardIndex >= currentQuestions.length) {
+                endGame();
+            } else {
+                renderCards();
+            }
+        });
+
+        function endGame() {
+            document.getElementById('end-screen').classList.remove('hidden');
+            document.getElementById('end-screen').classList.add('flex');
+            document.getElementById('final-score').textContent = score;
+            cardContainer.innerHTML = ''; // Bersihkan kartu
+        }
+
+        // DOM Elemen Beranda & Data Siswa
+        const homeScreen = document.getElementById('home-screen');
+        const gameScreen = document.getElementById('game-screen');
+        const studentNameInput = document.getElementById('student-name');
+        const studentClassInput = document.getElementById('student-class');
+        const btnStart = document.getElementById('btn-start');
+        const errorName = document.getElementById('error-name');
+        const errorClass = document.getElementById('error-class');
+        
+        const displayPlayerName = document.getElementById('display-player-name');
+        const endPlayerName = document.getElementById('end-player-name');
+        const endPlayerClass = document.getElementById('end-player-class');
+
+        // Logika Tombol Mulai
+        btnStart.addEventListener('click', () => {
+            const name = studentNameInput.value.trim();
+            const kelas = studentClassInput.value;
+            let isValid = true;
+
+            // Validasi Input Nama
+            if (!name) {
+                errorName.classList.remove('hidden');
+                studentNameInput.classList.add('border-red-400', 'bg-red-50');
+                isValid = false;
+            } else {
+                errorName.classList.add('hidden');
+                studentNameInput.classList.remove('border-red-400', 'bg-red-50');
+            }
+
+            // Validasi Input Kelas
+            if (!kelas) {
+                errorClass.classList.remove('hidden');
+                studentClassInput.classList.add('border-red-400', 'bg-red-50');
+                isValid = false;
+            } else {
+                errorClass.classList.add('hidden');
+                studentClassInput.classList.remove('border-red-400', 'bg-red-50');
+            }
+
+            if (isValid) {
+                // Simpan data siswa ke UI
+                displayPlayerName.textContent = name;
+                endPlayerName.textContent = name;
+                endPlayerClass.textContent = `Kelas ${kelas}`;
+
+                // Efek Transisi Layar
+                homeScreen.classList.add('opacity-0', 'transition-opacity', 'duration-500');
+                
+                setTimeout(() => {
+                    homeScreen.classList.add('hidden');
+                    gameScreen.classList.remove('hidden');
+                    
+                    // Inisialisasi game hanya setelah tombol mulai diklik
+                    initGame();
+                }, 500);
+            }
+        });
+
+        // Event Listeners untuk Tombol Aksi Bawah
+        btnIlmiah.addEventListener('click', () => handleChoice('ilmiah'));
+        btnPopuler.addEventListener('click', () => handleChoice('populer'));
+
+        // Fokus otomatis ke input nama saat halaman dimuat
+        window.onload = () => {
+            studentNameInput.focus();
+        };
+
+    </script>
+</body>
+</html>
